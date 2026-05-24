@@ -1,0 +1,7 @@
+chainwatch
+chainwatch-*
+dist/
+*.log
+.DS_Store
+CLAUDE.md
+inventory.txt
