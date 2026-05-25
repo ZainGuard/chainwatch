@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,6 +90,7 @@ func (c *PhylumClient) Scan(
 		mu      sync.Mutex
 		wg      sync.WaitGroup
 		results []models.Finding
+		scanErr error
 	)
 
 	for _, pkg := range targets {
@@ -100,6 +102,9 @@ func (c *PhylumClient) Scan(
 
 			findings, err := c.queryPackage(ctx, p)
 			if err != nil {
+				mu.Lock()
+				scanErr = errors.Join(scanErr, err)
+				mu.Unlock()
 				return
 			}
 			if len(findings) > 0 {
@@ -110,6 +115,9 @@ func (c *PhylumClient) Scan(
 		}(pkg)
 	}
 	wg.Wait()
+	if scanErr != nil {
+		return results, fmt.Errorf("phylum: one or more package checks failed: %w", scanErr)
+	}
 	return results, nil
 }
 

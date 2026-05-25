@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		mu       sync.Mutex
 		wg       sync.WaitGroup
 		allFinds []models.Finding
+		runErr   error
 	)
 
 	for _, client := range s.clients {
@@ -74,6 +76,9 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 
 			findings, err := c.Scan(ctx, pkgs, exts)
 			if err != nil {
+				mu.Lock()
+				runErr = errors.Join(runErr, fmt.Errorf("%s scan failed: %w", c.Name(), err))
+				mu.Unlock()
 				return
 			}
 
@@ -92,6 +97,9 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 	hits, misses := s.cache.stats()
 	if s.Progress != nil {
 		s.Progress(fmt.Sprintf("Cache: %d hits, %d misses", hits, misses))
+	}
+	if runErr != nil {
+		return nil, runErr
 	}
 
 	return &models.ScanResult{
