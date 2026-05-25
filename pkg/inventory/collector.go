@@ -22,6 +22,10 @@ func Collect() *models.Inventory {
 	inv.Packages = append(inv.Packages, collectGoModules()...)
 	inv.Packages = append(inv.Packages, collectBrewPackages()...)
 
+	mcpExts, mcpPkgs := collectMCPComponents()
+	inv.Extensions = append(inv.Extensions, mcpExts...)
+	inv.Packages = append(inv.Packages, mcpPkgs...)
+
 	return inv
 }
 

@@ -69,7 +69,6 @@ func PrintTable(out io.Writer, result *models.ScanResult, minSev models.Severity
 			colorCyan, colorReset,
 			len(result.Inventory.Packages),
 			len(result.Inventory.Extensions))
-		fmt.Fprintf(out, "%sNo vulnerability scanning — use Snyk/Dependabot for CVEs.%s\n", colorGray, colorReset)
 		return
 	}
 
@@ -90,26 +89,33 @@ func PrintTable(out io.Writer, result *models.ScanResult, minSev models.Severity
 		}
 		byThreat := groupByThreat(group)
 		for threat, finds := range byThreat {
-			label := fmt.Sprintf("%s — %s (%d)", strings.ToUpper(string(sev)), strings.ToUpper(string(threat)), len(finds))
+			merged := mergeByComponent(finds)
+			label := fmt.Sprintf("%s — %s (%d)", strings.ToUpper(string(sev)), strings.ToUpper(string(threat)), len(merged))
 			fmt.Fprintf(out, "%s%s%s\n", sevColor(sev), label, colorReset)
-			for _, f := range finds {
+			for _, m := range merged {
 				fmt.Fprintf(out, "  %-8s %-30s %-12s\n",
-					string(f.Ecosystem),
-					f.Name,
-					f.Version)
-				if f.Description != "" {
-					fmt.Fprintf(out, "  %s%s: %s%s\n", colorGray, f.Source, f.Description, colorReset)
+					string(m.Ecosystem),
+					m.Name,
+					m.Version)
+				// Show source attribution: single source or [source1, source2, ...]
+				sourceTag := m.Sources[0]
+				if len(m.Sources) > 1 {
+					sourceTag = fmt.Sprintf("[%s]", strings.Join(m.Sources, ", "))
 				}
-				if f.URL != "" {
-					fmt.Fprintf(out, "  %s%s%s\n", colorGray, f.URL, colorReset)
+				if m.Description != "" {
+					fmt.Fprintf(out, "  %s%s: %s%s\n", colorGray, sourceTag, m.Description, colorReset)
+				}
+				if m.URL != "" {
+					fmt.Fprintf(out, "  %s%s%s\n", colorGray, m.URL, colorReset)
 				}
 			}
 			fmt.Fprintln(out)
 		}
 	}
 
+	// Count unique components (not raw findings) for the summary line
+	total := len(mergeByComponent(filtered))
 	counts := countBySeverity(filtered)
-	total := len(filtered)
 	fmt.Fprintf(out, "%d threat%s detected across %d packages, %d extensions. [%dms]\n",
 		total, plural(total),
 		len(result.Inventory.Packages),
@@ -125,7 +131,55 @@ func PrintTable(out io.Writer, result *models.ScanResult, minSev models.Severity
 	if len(parts) > 0 {
 		fmt.Fprintf(out, "Severity breakdown: %s\n", strings.Join(parts, ", "))
 	}
-	fmt.Fprintf(out, "%sNo vulnerability scanning — use Snyk/Dependabot for CVEs.%s\n", colorGray, colorReset)
+}
+
+// mergedFinding is a Finding collapsed across sources for table display.
+type mergedFinding struct {
+	models.Finding
+	Sources []string // all source names that flagged this component
+}
+
+// mergeByComponent collapses findings with the same ecosystem+name+version+threat_type
+// into a single row, combining their sources. The description and URL come from the
+// highest-severity finding (or the one with the most informative description).
+func mergeByComponent(findings []models.Finding) []mergedFinding {
+	type key struct {
+		eco     models.Ecosystem
+		name    string
+		version string
+		threat  models.ThreatType
+	}
+
+	order := []key{}
+	groups := map[key][]models.Finding{}
+
+	for _, f := range findings {
+		k := key{f.Ecosystem, f.Name, f.Version, f.ThreatType}
+		if _, exists := groups[k]; !exists {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], f)
+	}
+
+	out := make([]mergedFinding, 0, len(order))
+	for _, k := range order {
+		group := groups[k]
+		best := group[0]
+		sources := make([]string, 0, len(group))
+		seen := map[string]bool{}
+		for _, f := range group {
+			if !seen[f.Source] {
+				sources = append(sources, f.Source)
+				seen[f.Source] = true
+			}
+			// Prefer longer descriptions and higher-severity sources
+			if len(f.Description) > len(best.Description) {
+				best = f
+			}
+		}
+		out = append(out, mergedFinding{Finding: best, Sources: sources})
+	}
+	return out
 }
 
 func sevColor(sev models.Severity) string {
@@ -195,6 +249,7 @@ func PrintInventoryTable(out io.Writer, inv *models.Inventory) {
 		models.EcoNpm, models.EcoPip, models.EcoCargo, models.EcoGo, models.EcoBrew,
 		models.EcoVSCode, models.EcoCursor, models.EcoWindsurf, models.EcoZed, models.EcoJetBrains,
 		models.EcoChrome, models.EcoEdge, models.EcoBrave, models.EcoFirefox,
+		models.EcoMCP,
 	}
 
 	// Group packages by ecosystem.
@@ -233,16 +288,30 @@ func PrintInventoryTable(out io.Writer, inv *models.Inventory) {
 		if !ok {
 			continue
 		}
-		sort.Slice(exts, func(i, j int) bool { return exts[i].ID < exts[j].ID })
+		sort.Slice(exts, func(i, j int) bool {
+			if exts[i].Name != exts[j].Name {
+				return exts[i].Name < exts[j].Name
+			}
+			return exts[i].Version < exts[j].Version
+		})
 		fmt.Fprintf(out, "\n  %s%s%s (%d)\n", colorBold, strings.ToUpper(string(eco)), colorReset, len(exts))
 		for _, e := range exts {
-			label := e.ID
-			if e.Name != "" && e.Name != e.ID {
-				label = fmt.Sprintf("%-40s %s(%s)%s", e.ID, colorGray, e.Name, colorReset)
+			name := e.Name
+			if name == "" {
+				name = e.ID
 			}
-			fmt.Fprintf(out, "    %-55s %s%s%s\n",
-				label,
-				colorGray, e.Version, colorReset)
+			id := ""
+			if e.ID != "" && e.ID != name {
+				id = fmt.Sprintf("  %s%s%s", colorGray, e.ID, colorReset)
+			}
+			profile := ""
+			if e.Profile != "" {
+				profile = fmt.Sprintf("  %s[%s]%s", colorGray, e.Profile, colorReset)
+			}
+			fmt.Fprintf(out, "    %-40s %s%-12s%s%s%s\n",
+				name,
+				colorGray, e.Version, colorReset,
+				id, profile)
 		}
 	}
 	fmt.Fprintln(out)
@@ -276,6 +345,13 @@ func PrintInventorySummary(out io.Writer, inv *models.Inventory) {
 		if n := extCounts[eco]; n > 0 {
 			fmt.Fprintf(out, "  %-12s %s%d%s\n", eco, colorCyan, n, colorReset)
 		}
+	}
+
+	fmt.Fprintf(out, "\n%sAI AGENTS%s\n", colorBold, colorReset)
+	if n := extCounts[models.EcoMCP]; n > 0 {
+		fmt.Fprintf(out, "  %-12s %s%d%s\n", "mcp servers", colorCyan, n, colorReset)
+	} else {
+		fmt.Fprintf(out, "  %snone found%s\n", colorGray, colorReset)
 	}
 	fmt.Fprintln(out)
 }

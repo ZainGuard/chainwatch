@@ -9,16 +9,25 @@ import (
 	"github.com/zainguard/chainwatch/pkg/models"
 )
 
-// ThreatIntelClient is implemented by Socket.dev and Phylum.io clients.
+// ThreatIntelClient is the only interface a new threat source needs to implement.
+// Add a client, register it in main.go — scanner handles everything else.
 type ThreatIntelClient interface {
 	Name() string
 	Scan(ctx context.Context, pkgs []models.PackageRecord, exts []models.ExtensionRecord) ([]models.Finding, error)
 }
 
+// Debuggable is an optional interface. Clients that implement it receive
+// per-request debug lines when --verbose is set. No scanner changes needed
+// when adding a new client that supports it.
+type Debuggable interface {
+	SetDebug(fn func(string))
+}
+
 type Scanner struct {
 	clients  []ThreatIntelClient
 	cache    *Cache
-	Progress func(msg string) // optional progress callback
+	Progress func(msg string) // optional: progress lines (stderr)
+	Debug    func(msg string) // optional: per-request debug lines (stderr)
 }
 
 func NewScanner(cacheDir string, clients ...ThreatIntelClient) *Scanner {
@@ -53,6 +62,12 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		go func(c ThreatIntelClient, pkgs []models.PackageRecord, exts []models.ExtensionRecord) {
 			defer wg.Done()
 
+			if s.Debug != nil {
+				if d, ok := c.(Debuggable); ok {
+					d.SetDebug(s.Debug)
+				}
+			}
+
 			if s.Progress != nil {
 				s.Progress(fmt.Sprintf("Querying %s (%d packages, %d extensions)...", c.Name(), len(pkgs), len(exts)))
 			}
@@ -62,8 +77,8 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 				return
 			}
 
-			// Cache individual package results.
 			s.cacheResults(c.Name(), pkgs, findings)
+			s.cacheExtResults(c.Name(), exts, findings)
 
 			mu.Lock()
 			allFinds = append(allFinds, findings...)
@@ -111,16 +126,26 @@ func (s *Scanner) partitionExtensions(source string, exts []models.ExtensionReco
 }
 
 func (s *Scanner) cacheResults(source string, pkgs []models.PackageRecord, findings []models.Finding) {
-	// Build per-package finding map.
 	byKey := make(map[string][]models.Finding)
 	for _, f := range findings {
 		k := source + ":" + string(f.Ecosystem) + ":" + f.Name + ":" + f.Version
 		byKey[k] = append(byKey[k], f)
 	}
-
 	for _, p := range pkgs {
 		k := source + ":" + string(p.Ecosystem) + ":" + p.Name + ":" + p.Version
 		s.cache.set(source, p.Ecosystem, p.Name, p.Version, byKey[k])
+	}
+}
+
+func (s *Scanner) cacheExtResults(source string, exts []models.ExtensionRecord, findings []models.Finding) {
+	byKey := make(map[string][]models.Finding)
+	for _, f := range findings {
+		k := source + ":" + string(f.Ecosystem) + ":" + f.Name + ":" + f.Version
+		byKey[k] = append(byKey[k], f)
+	}
+	for _, e := range exts {
+		k := source + ":" + string(e.Ecosystem) + ":" + e.ID + ":" + e.Version
+		s.cache.set(source, e.Ecosystem, e.ID, e.Version, byKey[k])
 	}
 }
 

@@ -1,0 +1,97 @@
+version: 2
+
+project_name: chainwatch
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./pkg/...
+
+builds:
+  - id: chainwatch
+    main: ./cmd/chainwatch
+    binary: chainwatch
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.binaryVersion={{.Version}}
+
+archives:
+  - id: chainwatch
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+# Generates CHANGELOG from conventional commits between tags.
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: "New features"
+      regexp: "^feat"
+      order: 0
+    - title: "Bug fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "Other"
+      order: 999
+
+release:
+  github:
+    owner: zainguard
+    name: chainwatch
+  name_template: "v{{.Version}}"
+  footer: |
+    ## Install
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/zainguard/chainwatch/main/install.sh | bash
+    ```
+
+    Or download a binary directly from the assets above.
+
+brews:
+  - name: chainwatch
+    homepage: https://github.com/zainguard/chainwatch
+    description: "Supply chain threat scanner for developer machines"
+    license: MIT
+    repository:
+      owner: zainguard
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: zainguard-bot
+      email: bot@zainguard.io
+    install: |
+      bin.install "chainwatch"
+    test: |
+      system "#{bin}/chainwatch", "--version"

@@ -21,6 +21,7 @@ const (
 	EcoGo        Ecosystem = "go"
 	EcoGem       Ecosystem = "gem"
 	EcoBrew      Ecosystem = "brew"
+	EcoMCP       Ecosystem = "mcp"
 )
 
 // ThreatType describes the nature of a detected supply chain threat.
@@ -74,6 +75,7 @@ type ExtensionRecord struct {
 	Name      string    `json:"name,omitempty"`
 	Publisher string    `json:"publisher,omitempty"`
 	Ecosystem Ecosystem `json:"ecosystem"`
+	Profile   string    `json:"profile,omitempty"` // browser profile (e.g. "Default", "Profile 3")
 }
 
 // PackageRecord describes a single installed package.

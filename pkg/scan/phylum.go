@@ -51,7 +51,10 @@ type PhylumClient struct {
 	apiKey string
 	client *http.Client
 	sem    chan struct{}
+	debug  func(msg string)
 }
+
+func (c *PhylumClient) SetDebug(fn func(string)) { c.debug = fn }
 
 func NewPhylumClient(apiKey string) *PhylumClient {
 	return &PhylumClient{
