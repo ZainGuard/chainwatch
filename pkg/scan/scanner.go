@@ -45,6 +45,7 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		mu       sync.Mutex
 		wg       sync.WaitGroup
 		allFinds []models.Finding
+		runErr   error
 	)
 
 	for _, client := range s.clients {
@@ -73,16 +74,19 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 			}
 
 			findings, err := c.Scan(ctx, pkgs, exts)
+			mu.Lock()
+			allFinds = append(allFinds, findings...)
+			if err != nil && runErr == nil {
+				runErr = fmt.Errorf("%s scan failed: %w", c.Name(), err)
+			}
+			mu.Unlock()
+
 			if err != nil {
 				return
 			}
 
 			s.cacheResults(c.Name(), pkgs, findings)
 			s.cacheExtResults(c.Name(), exts, findings)
-
-			mu.Lock()
-			allFinds = append(allFinds, findings...)
-			mu.Unlock()
 		}(client, uncachedPkgs, uncachedExts)
 	}
 
@@ -94,12 +98,14 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		s.Progress(fmt.Sprintf("Cache: %d hits, %d misses", hits, misses))
 	}
 
-	return &models.ScanResult{
+	result := &models.ScanResult{
 		Inventory:  inv,
 		Findings:   dedup(allFinds),
 		ScannedAt:  start,
 		DurationMs: time.Since(start).Milliseconds(),
-	}, nil
+	}
+
+	return result, runErr
 }
 
 func (s *Scanner) partitionPackages(source string, pkgs []models.PackageRecord) (uncached []models.PackageRecord, findings []models.Finding) {
