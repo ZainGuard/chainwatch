@@ -1,4 +1,4 @@
-chainwatch
+/chainwatch
 chainwatch-*
 dist/
 *.log

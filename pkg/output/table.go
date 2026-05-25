@@ -13,41 +13,25 @@ import (
 const version = "0.1.0"
 
 var (
-	colorReset    = "\033[0m"
-	colorBold     = "\033[1m"
-	colorRed      = "\033[31m"
-	colorYellow   = "\033[33m"
-	colorCyan     = "\033[36m"
-	colorGray     = "\033[90m"
-	colorBoldRed  = "\033[1;31m"
-	colorBoldYel  = "\033[1;33m"
-	colorBoldCyan = "\033[1;36m"
+	colorReset   = "\033[0m"
+	colorBold    = "\033[1m"
+	colorRed     = "\033[31m"
+	colorCyan    = "\033[36m"
+	colorGray    = "\033[90m"
+	colorBoldRed = "\033[1;31m"
+	colorBoldYel = "\033[1;33m"
 )
 
-// noColor disables ANSI escapes when true.
-var noColor bool
-
 func SetNoColor(v bool) {
-	noColor = v
 	if v {
 		colorReset = ""
 		colorBold = ""
 		colorRed = ""
-		colorYellow = ""
 		colorCyan = ""
 		colorGray = ""
 		colorBoldRed = ""
 		colorBoldYel = ""
-		colorBoldCyan = ""
 	}
-}
-
-func isTTY() bool {
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 // PrintHeader writes the scan header to stderr.

@@ -9,7 +9,7 @@ before:
 
 builds:
   - id: chainwatch
-    main: ./cmd/chainwatch
+    dir: cmd/chainwatch
     binary: chainwatch
     env:
       - CGO_ENABLED=0
@@ -44,7 +44,6 @@ archives:
 checksum:
   name_template: checksums.txt
 
-# Generates CHANGELOG from conventional commits between tags.
 changelog:
   sort: asc
   use: github
@@ -79,7 +78,7 @@ release:
 
     Or download a binary directly from the assets above.
 
-brews:
+homebrew:
   - name: chainwatch
     homepage: https://github.com/zainguard/chainwatch
     description: "Supply chain threat scanner for developer machines"
