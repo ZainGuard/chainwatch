@@ -32,4 +32,73 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew tap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -e
+          VERSION=${GITHUB_REF_NAME#v}
+          TAG=${GITHUB_REF_NAME}
+
+          # Pull checksums from the just-published release
+          gh release download "$TAG" --pattern checksums.txt --output /tmp/checksums.txt
+
+          MAC_AMD64=$(grep "darwin_amd64" /tmp/checksums.txt | awk '{print $1}')
+          MAC_ARM64=$(grep "darwin_arm64" /tmp/checksums.txt | awk '{print $1}')
+          LIN_AMD64=$(grep "linux_amd64"  /tmp/checksums.txt | awk '{print $1}')
+          LIN_ARM64=$(grep "linux_arm64"  /tmp/checksums.txt | awk '{print $1}')
+
+          BASE="https://github.com/zainguard/chainwatch/releases/download/${TAG}"
+
+          cat > /tmp/chainwatch.rb << FORMULA
+          class Chainwatch < Formula
+            desc "Supply chain threat scanner for developer machines"
+            homepage "https://github.com/zainguard/chainwatch"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "${BASE}/chainwatch_${VERSION}_darwin_arm64.tar.gz"
+                sha256 "${MAC_ARM64}"
+              end
+              on_intel do
+                url "${BASE}/chainwatch_${VERSION}_darwin_amd64.tar.gz"
+                sha256 "${MAC_AMD64}"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "${BASE}/chainwatch_${VERSION}_linux_arm64.tar.gz"
+                sha256 "${LIN_ARM64}"
+              end
+              on_intel do
+                url "${BASE}/chainwatch_${VERSION}_linux_amd64.tar.gz"
+                sha256 "${LIN_AMD64}"
+              end
+            end
+
+            def install
+              bin.install "chainwatch"
+            end
+
+            test do
+              system "#{bin}/chainwatch", "--version"
+            end
+          end
+          FORMULA
+
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/zainguard/homebrew-tap.git" /tmp/homebrew-tap
+          mkdir -p /tmp/homebrew-tap/Formula
+          cp /tmp/chainwatch.rb /tmp/homebrew-tap/Formula/chainwatch.rb
+
+          cd /tmp/homebrew-tap
+          git config user.email "218372296+sam-zainguard@users.noreply.github.com"
+          git config user.name "sam-zainguard"
+          git add Formula/chainwatch.rb
+          git diff --cached --quiet && echo "No formula changes" && exit 0
+          git commit -m "chore: update chainwatch to ${TAG}"
+          git push

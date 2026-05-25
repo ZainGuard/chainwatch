@@ -78,19 +78,3 @@ release:
 
     Or download a binary directly from the assets above.
 
-homebrew:
-  - name: chainwatch
-    homepage: https://github.com/zainguard/chainwatch
-    description: "Supply chain threat scanner for developer machines"
-    license: MIT
-    repository:
-      owner: zainguard
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    commit_author:
-      name: zainguard-bot
-      email: bot@zainguard.io
-    install: |
-      bin.install "chainwatch"
-    test: |
-      system "#{bin}/chainwatch", "--version"
