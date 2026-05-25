@@ -113,6 +113,10 @@ type ScanResult struct {
 	Findings   []Finding  `json:"findings"`
 	ScannedAt  time.Time  `json:"scanned_at"`
 	DurationMs int64      `json:"duration_ms"`
+	// Warnings contains non-fatal errors from threat intel sources (rate limits,
+	// outages, auth failures). A non-empty Warnings list means some packages may
+	// not have been checked — CI gates should treat this as a degraded scan.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Summary counts findings by severity.

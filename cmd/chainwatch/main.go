@@ -126,6 +126,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Surface degraded scan warnings before results.
+	for _, w := range result.Warnings {
+		fmt.Fprintf(os.Stderr, "  WARNING: %s\n", w)
+	}
+
 	switch *outFormat {
 	case "json":
 		if err := output.PrintJSON(os.Stdout, result, minSev); err != nil {

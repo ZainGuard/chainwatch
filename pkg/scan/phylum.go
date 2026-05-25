@@ -89,6 +89,7 @@ func (c *PhylumClient) Scan(
 		mu      sync.Mutex
 		wg      sync.WaitGroup
 		results []models.Finding
+		errs    []error
 	)
 
 	for _, pkg := range targets {
@@ -100,6 +101,9 @@ func (c *PhylumClient) Scan(
 
 			findings, err := c.queryPackage(ctx, p)
 			if err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
 				return
 			}
 			if len(findings) > 0 {
@@ -110,6 +114,10 @@ func (c *PhylumClient) Scan(
 		}(pkg)
 	}
 	wg.Wait()
+
+	if len(errs) > 0 {
+		return results, fmt.Errorf("phylum.io: %d package lookup(s) failed (first: %w)", len(errs), errs[0])
+	}
 	return results, nil
 }
 

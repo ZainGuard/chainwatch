@@ -246,10 +246,9 @@ func (c *SocketClient) queryBatch(ctx context.Context, pkgs []models.PackageReco
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		if c.debug != nil {
-			c.debug("socket.dev  429  rate limited — backing off 5s")
+			c.debug("socket.dev  429  rate limited")
 		}
-		time.Sleep(5 * time.Second)
-		return nil, nil
+		return nil, fmt.Errorf("socket.dev: rate limited (429)")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("socket.dev: unexpected status %d", resp.StatusCode)

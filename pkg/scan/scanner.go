@@ -45,6 +45,7 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		mu       sync.Mutex
 		wg       sync.WaitGroup
 		allFinds []models.Finding
+		warnings []string
 	)
 
 	for _, client := range s.clients {
@@ -74,6 +75,12 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 
 			findings, err := c.Scan(ctx, pkgs, exts)
 			if err != nil {
+				mu.Lock()
+				warnings = append(warnings, fmt.Sprintf("%s: %v", c.Name(), err))
+				// Include any partial findings returned alongside the error,
+				// but do NOT cache them — the client did not check all items.
+				allFinds = append(allFinds, findings...)
+				mu.Unlock()
 				return
 			}
 
@@ -99,6 +106,7 @@ func (s *Scanner) Run(ctx context.Context, inv *models.Inventory) (*models.ScanR
 		Findings:   dedup(allFinds),
 		ScannedAt:  start,
 		DurationMs: time.Since(start).Milliseconds(),
+		Warnings:   warnings,
 	}, nil
 }
 
