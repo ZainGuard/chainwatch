@@ -90,7 +90,10 @@ func main() {
 		case "json":
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			enc.Encode(inv)
+			if err := enc.Encode(inv); err != nil {
+				fmt.Fprintf(os.Stderr, "chainwatch: json encode error: %v\n", err)
+				os.Exit(1)
+			}
 		case "summary":
 			output.PrintInventorySummary(os.Stdout, inv)
 		default: // table
