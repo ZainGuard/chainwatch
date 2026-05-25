@@ -130,9 +130,9 @@ CVE scanning (use Snyk, Dependabot, or Trivy), license compliance, runtime monit
 
 ---
 
-## ZainGuard
+## Zainguard
 
-Chainwatch is the open source core of [ZainGuard](https://zainguard.io), a supply chain security platform for security teams.
+Chainwatch is the open source core of [Zainguard](https://zainguard.com), a multi-tenant SaaS security and compliance platform.
 
 ---
 
