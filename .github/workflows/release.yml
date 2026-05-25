@@ -39,6 +39,11 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           set -e
+          if ! [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag '${GITHUB_REF_NAME}'. Expected SemVer format like v1.2.3." >&2
+            exit 1
+          fi
+
           VERSION=${GITHUB_REF_NAME#v}
           TAG=${GITHUB_REF_NAME}
 
