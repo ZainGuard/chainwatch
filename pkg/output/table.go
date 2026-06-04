@@ -53,6 +53,7 @@ func PrintTable(out io.Writer, result *models.ScanResult, minSev models.Severity
 			colorCyan, colorReset,
 			len(result.Inventory.Packages),
 			len(result.Inventory.Extensions))
+		fmt.Fprintf(out, "  Run with --inventory to see everything that was scanned.\n")
 		return
 	}
 

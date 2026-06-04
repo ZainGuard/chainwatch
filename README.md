@@ -14,6 +14,12 @@ Not a CVE scanner. Focuses on malware, hijacked packages, typosquatting, and obf
 go install github.com/zainguard/chainwatch/cmd/chainwatch@latest
 ```
 
+`go install` places the binary in `$(go env GOPATH)/bin` (usually `~/go/bin`). If `chainwatch` is not found after install, add that directory to your PATH:
+
+```bash
+export PATH="$HOME/go/bin:$PATH"
+```
+
 Or build from source:
 
 ```bash
@@ -22,6 +28,17 @@ cd chainwatch && go build -o chainwatch ./cmd/chainwatch
 ```
 
 > Homebrew and pre-built binaries coming soon.
+
+### Uninstall
+
+Download and run the uninstall script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zainguard/chainwatch/main/uninstall.sh -o uninstall.sh
+sh uninstall.sh
+```
+
+The script removes the binary and optionally clears cached scan data at `~/.chainwatch`.
 
 ---
 
