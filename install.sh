@@ -72,4 +72,4 @@ else
 fi
 
 echo ""
-chainwatch --version
+"$INSTALL_DIR/$BINARY" --version
